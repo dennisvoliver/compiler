@@ -1,0 +1,439 @@
+The very process of macro revolves around the concept of substitution.
+In order to conduct a proper substitution, two things need to be known:
+The original string and the string to be substituted to the original.
+This is harder than it sounds.
+
+The original string is by convention the name of the macro name.
+The string to be substituted is the macro body.
+The macro name is not the only string of characters in the original source file.
+Usually it is mixed with other strings of characters.
+By convention, a macro name appearing in the source file should be "surrounded"
+by whatever word separator is chosen in the language.
+
+The first task of the preprocessor is to identify whether a word is a macro-name
+or not. As soon as the word is sucessfully identified as a macro-name the preprocessor
+then, instead of "spitting out" the macro-name will spit out the macro-body.
+
+This seems like an extremely simple task.
+But that does not end there.
+Before a "macro expansion" --as the process is usually called-- can occur, the
+preprocessor must know first which words are macro-names and which are their
+corresponding macro-bodies.
+
+This can be done through the use of a macro-language.
+The preprocessor, before reading the source file proper, must read the
+macro-definition section first. This will give it the knowledge on
+which words must be replaced by other words in the source file.
+
+Conventionally, the macro-definitions are placed in the same file as the
+source file proper, but --through the use of another language entity-- must
+be distinguishable from the source file proper.
+
+In the programming language C, macro-definitions start with the keyword "#define".
+The macro-definition is then assumed to be all characters following that keyword
+up to the end of the line.
+
+We can think of the preprocessor as a text filter that takes as its input the
+unprocessed source file, and produces --after expanding all macro-names-- the
+processed source file.
+
+All of these appears to be extremely simple and require nothing more than a
+finite state machine. However, macros usually possess a capability that will
+complicate the matter by an order of magnitude: parameters.
+
+A macro-parameter may be considered a macro-definition inside a macro-definition.
+The goal of the macro-parameter is to replace every appearance of the macro-parameter-name
+in the macro-body with the macro-parameter-body.
+
+For instance, in the C language, a typical macro-definition looks like:
+
+#define sample-macro(x) sample-body-xyz
+
+Then a macro-name appearance in the source file may look like:
+
+int sample-function(void)
+{
+	return sample-macro(0);
+}
+
+
+After the source file is fed to the preprocessor, the particular code section above will
+be replaced with:
+
+int sample-function(void)
+{
+	return sample-body0yz
+}
+
+Not only was the string sample-macro(0) replaced by something completely different, the
+x in the macro-definition was also replaced by 0.
+
+Think of it like this, the macro-name gets replaced by the macro-body, but all the strings
+placed in the parameter are "preserved", or rather, used to replace the appearance of
+the placeholder in the macro-body.
+
+So, in here, there are two substitutions happening. Once from macro-name to macro-body
+and second from parameter to placeholder.
+
+Therefore, whatsoever process is used in the macro-substitution may also be used for
+the parameter-substitution.
+
+
+So, if we use a symbol table for the macro-names and bodies, we must also use another
+symbol table for the parameters.
+
+My proposed solution is that the preprocessor must unambiguously know, upon encountering
+a macro-definition, the placeholder characters for the parameters. And, upon encountering
+a macro-name in the program text, must unambiguously know the arguments in place of the parameters
+and it must at that point, create a symbol table for the arguments.
+
+In fact, to make it more convenient for the preprocessor, a keyword should also be used
+before a macro-name appears in the source file, so that the preprocessor knows immediately
+that it must now go a state where it needs to look for the symbol that matches the found
+macro-name.
+
+This saves her from having to guess whether a word is a macro-name or not for every word
+she encounters. Let's say that keyword is "macro", an appearance of the macro-name in the 
+source file should be like
+
+while (true) {
+	do some stuff;
+	macro macro-name arg1 arg2;
+}
+
+Now, we will complicate the matter another order of magnitude further.
+Suppose that it is possible for one of the arguments in the syntax
+	<macro-keyword> <macro-name> <first-argument> <second-argument> ...
+
+is in fact also a <macro-keyword>, what then?
+This introduces the concept of recursion, or less formally, "nesting".
+
+This is so much more complicated than one would initially think.
+The first problem is that in which order should the macros be expanded?
+Should the inner-most macro be expanded first? If so, then how can the
+outer-most macro keep track of which string should be accepted as an
+argument. Is it the expanded string or the not yet expanded string?
+
+Since the problem is a recursive one, I am inclined to use a recursive solution.
+The algorithm should go along the lines of
+again:	if <macro-keyword> then
+		if <macro-keyword then
+			goto again;
+		else
+			expand <arg>;
+
+
+My chosen solution requires that the inner macros "return" to the outer macros
+their output strings so that the outer macros can process them normally.
+The algorithm in fake C language is something like:
+
+parse_source()
+{
+	get_word();
+	if (is_macro())
+		macro_found();
+}
+
+
+macro_found()
+{
+	expand_macro()
+	output_final_string();
+}
+
+expand_macro()
+{
+	get_word();
+	if (is_macro())
+		expand_macro();
+	return expanded macro;
+}
+
+-> Fri Oct 14 03:25:12 PHT 2016
+The lambda calculus can be made even more succinct.
+Notice that in every lambda expression, the bounded
+variables usually appear twice?
+We can remove this redundancy by using some symbol, say '$'
+in every lambda expression and follow it by a number.
+This will denote the "argument number" of the function.
+For instance, what would typically be expressed as
+\xyz.(ExEzExEy)
+can now be expressed as
+(E$1E$3E$1E$2)
+
+Now, the presence of the '$' sign makes any expression
+a lambda expression, or a function.
+
+Now , some may ask, what about the disappearance of
+parameters? Like, for example, the expression
+
+\sz.z
+
+How can that be expressed when s needs to disappear?
+Easy, just use a different argument number like
+
+($2)
+
+This effectively selects the second argument.
+Thus, given any '$n' for some natural number n,
+if the term '$k' appears in any expression E, such
+that k is a natural number less than n, then all
+the arguments given to E whose ordering is less
+n are effectively destroyed.
+
+This makes the general selection method much
+easier to implement.
+
+This answers the question, what happens if you
+apply an expresion E to another expression F if
+E is not a function?
+
+Simple, nothing happens. The argument disappears.
+But now we have a different problem.
+What happens if, in a nested function, one parameter
+which is global to itself but not to the outter
+function, becomes bounded?
+
+How does a bounded variable of one function appear
+as global to another if only their ordering
+is taken into account?
+
+A hackish fix would be to also name the lambda expressions
+with numbers. Now, this somehow defeats the purpose
+of the lambda calculus and probably weakens its
+power, as one of the great things about lambda
+is that you do not have to name your functions
+to define them.
+
+Well, I hate to tell you that the notion of
+unnamed functions is an illusion! The mere
+fact that one is able to distinguish between
+two unnamed functions is proof that the
+functions are in fact named!
+
+For instance, let there be two identical functions
+A and B. Then, suppose that in the body of another
+expressoin E, both A and B appear. The usual
+reaction to this is to ensure that the bounded
+variables of A and B do no create any conflict.
+
+Or rather, a better example would be if some
+bounded variable x of A appears free in B.
+The prescribed action is to change the name
+of the bounded variable before performing
+substitution.
+
+The problem is that the mere fact you are able
+to change the name of the bounded variable
+implies you can distinguish the functions in
+the first place. Whatsoever distinction this is
+can be used as the functions's name!
+
+And so, this justifies our use of function
+names to identify to which function a 
+particular argument appears.
+
+Now, what about free variables? Since they do not
+belong to any function, naming them after
+their argument ordering would be meaningless.
+
+Well, free variables are inherently meaningless!
+At least, as long as a function is not within
+another function and its free variable is not
+a bound variable of another function, the
+free variable is meaningless. It's just an
+empty symbol. You really cannot do anything with it.
+
+Okay, now what if I _want_ my free variable to be
+a bound variable of another function? How can I
+do so if bound variables are named after argument
+order?
+
+Huh? _Why_ would you want to is a better question.
+If you want some variable to be substituted for
+another thing, then make it bound!
+
+Okay, now I am convinced. It appears there is
+really nothing special about the syntax of the
+lambda calculus. It can be changed so long as
+several ideas are preserved. The main ones being
+the ability to distinguish between names, and
+the ability to substitute one name for another and
+last but not least the ability to know which names
+should be substituted for what.
+
+That is correct, the whole system of the lambda
+calculus lies on those primitives, regardless
+of the medium of expression.
+
+-> Fri Oct 14 04:10:00 PHT 2016
+In conclusion, we may add another symbol '&' which tells us
+that the next number is a function name, so a function can
+be defined as a set of strings that contain
+
+&n$m
+
+where n and m are natural numbers. n is the function name, (which makes sense only
+if n is unique in a given context) and m is the argument name (provided no
+two m's have different meanings in one function definition).
+
+Using this syntax, the parenthesis must be heavily used not only to avoid
+ambiguity but is in fact the only thing that can determine which name
+will be substituted for what variable.
+
+For instance, the expression
+
+((E &1$1) F)
+
+or better yet,
+
+((E &1$1) (F G))
+
+If we removed the parenthesis, there is no way to tell which expression
+should take the place of &1$1 since &1 is indistinguishable without
+the parenthesis.
+
+((E &2$1) (F &1$1) G)
+
+is more dangerous. The reverse ordering of program numbers, makes the
+interpretation difficult without parenthesis. Ultimately it is the
+parenthesis that determines the "scope" of a [bounded] variable.
+
+((E &2$1 &1$1) B)
+
+In here, the notion of a free variable gone bounded is non-existent
+since the program numbers do not denote order but merely names.
+In the old syntax, this would be expressed as
+
+\x(\y(E y x)) B
+
+where it was necessary to know that the variable x is free in \y but bounded in \x.
+In my synax, there is really just one function.
+However, an extra pair of parenthesis is needed to perform the same action like
+((E &2$1 (&1$1 B))
+
+The effect is the same but the need for the extra parenthesis is due to the
+fact that &2 does not necessarily come to &1.
+
+But if it did, if we made some rule such that when being made to chose between
+two programs well within the same parenthesis pairs, the one with the lowest
+number should be chosen first.
+
+This will remove the need for an extra parenthesis and make it even more compact.
+
+
+Alright, now how can we use this for macro substitution?
+
+Simple, let S be the source file which contains E expressions mixed with macros,
+supposed that M is the macro and A is its parameter.
+
+S = (E (M B) E E (M D)) (M A)
+
+No, wrong
+
+S = (E (&1$1 B) E E (&1$1 D))
+M = (&2$1 b &2$1 B B )
+
+A macro expansion would be:
+
+S (M A)
+(E ((M A) B) EE ((M A) A))
+(E ((A A B B) EE ((A A B B) A)
+I am considering the idea of making a macro-expansion
+two-phased. The first phase is the simple macro expansion
+without parameters. Upon detection of a macro name,
+the compiler, instead of printing the macro name will
+look up the name in her symbol table and print the
+appropriate macro body.
+
+The second phase, however, will in fact be the recipient
+of the first phase's output.
+
+No, I think it would be easier if the first phase
+consist of the substitution of the given arguments
+to the macro body. Then, after the body is in its
+final form can it be wholly printed.
+
+This means that the compiler must parse, not only the
+macro name but also all possible arguments after it.
+If the number of arguments is fixed, this is no problem.
+
+Each macro name will have associated with it an argument
+table which maps the parameter placeholders in the
+macro body with the user-supplied arguments.
+
+This would be a mini-macro substitution phase. After
+the body is in its final form will it only be printed.
+
+As stated before, in order to make the compiler's job
+easier, a control character must be prepended to the
+macro name in the source file. This will allow the
+compiler to change her state to "reading macro".
+
+We will not be using place holders names, again in order
+to simplify matters but instead content ourselves with
+parameter numbers.
+
+If a parameter name has associated with it an argument
+number n, say, the compiler will assume that, after
+encountering the macro control character, it will parse
+the macro name followed by an ordered list of n arguments.
+
+If this is not reflected in the source file, then the
+whole process will have undefined behaviors (at worst,
+mangling the source file if the defined parameters are
+much more than the arguments supplied).
+
+For simplicity, again, we will use a multi-pass parameter
+substitutioner. It will keep parsing and substiting
+with next argument for the arguments with the least
+argument number. This is very inefficient as several
+memory allocations and deallocations are necessary
+but it does simplify the process a lot.
+
+Meanwhile, I need to catch some sleep.
+-> Fri Oct 14 10:33:09 PHT 2016
+
+Upon parsing the macro arguments in the source file,
+the compiler will create a temporary place for
+the function body for which the user-provided arguments
+can be replaced.
+
+Let A be an argument string and B be the macro body.
+Let the notion of replacing all instances of '\1' in
+B by B be denoted by
+
+	(B A)
+
+Now, let C be another argument. The notion of replacing
+all instances of C in the body (B A) will be denoted
+by
+
+	((B A) C)
+
+Okay, now supposed that, for instance, a macro definition
+in the source file is found like so
+
+	# N E\1F\3\2G
+
+The compiler will interpret the '#' character as a macro
+definition. It will now prepare itself for  the creation
+of another entry in its symbol table.
+
+When the compiler parses N, it will interpret it as a
+name of the symbol table entry. Then, the string
+
+	E\1F\3\2G
+
+will be interpreted as the macro body. However, how should
+the compiler know when to stop parsing for the string?
+
+In the C language, it waits for the newline character.
+This seems like a good idea, however this would imply
+that the parser will not be able to ignore whitespaces.
+This means we will need to prohibit the use of the special characters
+
+	# $ \
+
+in all instances of the source file, for the sake of simplicity.
+
